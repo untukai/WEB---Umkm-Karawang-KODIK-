@@ -1,4 +1,5 @@
 
+
 import { Product, Category, Article, Seller, Review, Order, Post, LiveSession, VirtualGift, Conversation, ChatMessage, FinancialTransaction, Promotion, Comment, Influencer } from '../types';
 
 export const categories: Category[] = [
@@ -212,7 +213,9 @@ export const orders: Order[] = [
       { product: products[0], quantity: 2 }, // 2 Serabi
       { product: products[3], quantity: 1 }  // 1 Dodol
     ],
-    total: 65000,
+    total: 66300,
+    subtotal: 65000,
+    serviceFee: 1300,
     status: 'selesai',
     date: '2023-10-20T08:00:00Z',
     shippingAddress: {
@@ -227,7 +230,9 @@ export const orders: Order[] = [
     items: [
       { product: products[2], quantity: 1 } // 1 Kaos
     ],
-    total: 85000,
+    total: 86700,
+    subtotal: 85000,
+    serviceFee: 1700,
     status: 'dikirim',
     date: '2023-10-25T13:45:00Z',
     shippingAddress: {
@@ -242,7 +247,9 @@ export const orders: Order[] = [
     items: [
       { product: products[0], quantity: 5 }
     ],
-    total: 75000,
+    total: 76500,
+    subtotal: 75000,
+    serviceFee: 1500,
     status: 'dikemas',
     date: '2023-10-28T09:30:00Z',
     shippingAddress: {
@@ -352,9 +359,9 @@ export const conversations: Conversation[] = [
 ];
 
 export const financialTransactions: FinancialTransaction[] = [
-    { id: 'TRX-001', date: '2023-10-25', type: 'Penjualan', description: 'Pendapatan dari pesanan #ORD-001', amount: 65000, status: 'Selesai' },
-    { id: 'TRX-002', date: '2023-10-26', type: 'Pencairan Dana', description: 'Pencairan ke Bank BCA', amount: -50000, status: 'Selesai' },
-    { id: 'TRX-003', date: '2023-10-28', type: 'Penjualan', description: 'Pendapatan dari pesanan #ORD-003', amount: 75000, status: 'Tertunda' },
+    { id: 'TRX-001', date: '2023-10-25', type: 'Pendapatan', description: 'Pendapatan dari pesanan #ORD-001', amount: 65000, status: 'Selesai', isCredit: true },
+    { id: 'TRX-002', date: '2023-10-26', type: 'Penarikan Saldo', description: 'Pencairan ke Bank BCA', amount: -50000, status: 'Selesai', isCredit: false },
+    { id: 'TRX-003', date: '2023-10-28', type: 'Pendapatan', description: 'Pendapatan dari pesanan #ORD-003', amount: 75000, status: 'Tertunda', isCredit: true },
 ];
 
 export const promotions: Promotion[] = [

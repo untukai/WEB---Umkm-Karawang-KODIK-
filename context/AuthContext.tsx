@@ -1,6 +1,6 @@
 
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { User } from '../types';
+import { User, FinancialTransaction } from '../types';
 
 interface AuthContextType {
   user: User | null;
@@ -9,108 +9,217 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
-  // FIX: Added spendCoins functionality for live stream gifts.
+  transactions: FinancialTransaction[];
+  // Wallet functions
+  topUpWallet: (amount: number, method: string) => void;
+  withdrawWallet: (amount: number, bankName: string, accountNumber: string) => boolean;
+  // Coin functions
   spendCoins: (amount: number) => boolean;
-  topUpCoins: (amount: number) => void;
+  buyCoinsWithWallet: (coinAmount: number) => boolean;
+  exchangeCoinsToWallet: (coinAmount: number) => boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// In a real app, this would be an API call. For now, we simulate it.
-const fetchUserProfileByToken = async (token: string): Promise<User | null> => {
-    const storedUser = localStorage.getItem('kodik-user-profile');
-    if (storedUser) {
-        // In a real app, you'd verify the token on the server and get the user profile.
-        // Here, we just check if a profile exists for the logged-in email.
-        const profile = JSON.parse(storedUser);
-        if (`dummy-token-for-${profile.email}` === token) {
-            return profile;
-        }
-    }
-    return null;
+// Helper to get transactions from storage
+const getStoredTransactions = (): FinancialTransaction[] => {
+    const stored = localStorage.getItem('kodik-transactions');
+    return stored ? JSON.parse(stored) : [];
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('kodik-accessToken'));
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
+    setTransactions([]);
     localStorage.removeItem('kodik-accessToken');
     localStorage.removeItem('kodik-user-profile');
   }, []);
 
+  const updateUserProfile = (updatedUser: User) => {
+      setUser(updatedUser);
+      localStorage.setItem('kodik-user-profile', JSON.stringify(updatedUser));
+  };
+
+  const addTransaction = (trx: FinancialTransaction) => {
+      const newTrxList = [trx, ...transactions];
+      setTransactions(newTrxList);
+      localStorage.setItem('kodik-transactions', JSON.stringify(newTrxList));
+  };
+
   useEffect(() => {
     const verifyTokenAndFetchUser = async () => {
       if (token) {
-        try {
-          const userProfile = await fetchUserProfileByToken(token);
-          if (userProfile) {
-            setUser(userProfile);
-          } else {
-            // Token is invalid or expired
+        const storedUser = localStorage.getItem('kodik-user-profile');
+        if (storedUser) {
+            setUser(JSON.parse(storedUser));
+            setTransactions(getStoredTransactions());
+        } else {
             logout();
-          }
-        } catch (error) {
-          console.error("Token verification failed:", error);
-          logout();
         }
       }
       setIsLoading(false);
     };
-
     verifyTokenAndFetchUser();
   }, [token, logout]);
 
-  // FIX: Added spendCoins function implementation.
-  const spendCoins = (amount: number): boolean => {
-    if (user && user.coins && user.coins >= amount) {
-        const updatedUser = { ...user, coins: user.coins - amount };
-        setUser(updatedUser);
-        // Persist updated user profile to localStorage
-        localStorage.setItem('kodik-user-profile', JSON.stringify(updatedUser));
+  // --- 1. Top Up Saldo ---
+  const topUpWallet = (amount: number, method: string) => {
+    if (user) {
+        const adminFee = 1000; 
+        // Note: Dalam sistem nyata, user bayar (amount + adminFee), saldo nambah (amount).
+        // Di sini kita simulasikan user sudah bayar totalnya.
+        
+        const updatedUser = { 
+            ...user, 
+            walletBalance: user.walletBalance + amount 
+        };
+        updateUserProfile(updatedUser);
+
+        addTransaction({
+            id: `TRX-${Date.now()}`,
+            date: new Date().toISOString(),
+            type: 'Top Up',
+            description: `Top Up Saldo via ${method}`,
+            amount: amount,
+            fee: adminFee,
+            method: method,
+            status: 'Selesai',
+            isCredit: true
+        });
+    }
+  };
+
+  // --- 2. Penarikan Saldo ---
+  const withdrawWallet = (amount: number, bankName: string, accountNumber: string): boolean => {
+    const adminFee = 5000;
+    const totalDeduction = amount + adminFee;
+
+    if (user && user.walletBalance >= totalDeduction) {
+        const updatedUser = { 
+            ...user, 
+            walletBalance: user.walletBalance - totalDeduction 
+        };
+        updateUserProfile(updatedUser);
+
+        addTransaction({
+            id: `WD-${Date.now()}`,
+            date: new Date().toISOString(),
+            type: 'Penarikan Saldo',
+            description: `Penarikan ke ${bankName} (${accountNumber})`,
+            amount: amount,
+            fee: adminFee,
+            method: bankName,
+            status: 'Selesai',
+            isCredit: false
+        });
         return true;
     }
     return false;
   };
 
-  const topUpCoins = (amount: number) => {
-    if (user) {
-        const updatedUser = { ...user, coins: (user.coins || 0) + amount };
-        setUser(updatedUser);
-        localStorage.setItem('kodik-user-profile', JSON.stringify(updatedUser));
+  // --- 3. Beli Koin (Saldo -> Coin) ---
+  // Rate: 1 Coin = 1.000 IDR
+  const buyCoinsWithWallet = (coinAmount: number): boolean => {
+      const cost = coinAmount * 1000;
+      if (user && user.walletBalance >= cost) {
+          const updatedUser = {
+              ...user,
+              walletBalance: user.walletBalance - cost,
+              coins: user.coins + coinAmount
+          };
+          updateUserProfile(updatedUser);
+
+          addTransaction({
+            id: `COIN-${Date.now()}`,
+            date: new Date().toISOString(),
+            type: 'Beli Koin',
+            description: `Pembelian ${coinAmount} Koin`,
+            amount: cost,
+            status: 'Selesai',
+            isCredit: false
+        });
+          return true;
+      }
+      return false;
+  };
+
+  // --- 4. Tukar Koin (Coin -> Saldo) ---
+  // Rate: 1 Coin = 1.000 IDR
+  const exchangeCoinsToWallet = (coinAmount: number): boolean => {
+      if (user && user.coins >= coinAmount) {
+          const value = coinAmount * 1000;
+          const updatedUser = {
+              ...user,
+              coins: user.coins - coinAmount,
+              walletBalance: user.walletBalance + value
+          };
+          updateUserProfile(updatedUser);
+
+          addTransaction({
+            id: `EXC-${Date.now()}`,
+            date: new Date().toISOString(),
+            type: 'Tukar Koin',
+            description: `Tukar ${coinAmount} Koin ke Saldo`,
+            amount: value,
+            status: 'Selesai',
+            isCredit: true
+        });
+          return true;
+      }
+      return false;
+  }
+
+  // --- Spend Coins (Gift) ---
+  const spendCoins = (amount: number): boolean => {
+    if (user && user.coins >= amount) {
+        const updatedUser = { ...user, coins: user.coins - amount };
+        updateUserProfile(updatedUser);
+        // Usually gifting doesn't create a financial transaction record for the spender in main history, 
+        // or it's a separate "Usage" history. For simplicity we skip main history or add minimal.
+        return true;
     }
+    return false;
   };
 
   const login = async (email: string, password: string, role: 'pembeli' | 'penjual') => {
-    // Simulate API call to get a token
-    console.log(`Simulating login for ${email} with password ${password}`);
-    
-    // In a real app, the server would return a token and user profile upon successful login.
-    // For now, we create a dummy token and user profile.
+    // Simulate Login
     const dummyToken = `dummy-token-for-${email}`;
     const newUserProfile: User = { 
-      id: 1, // Dummy ID
+      id: Math.floor(Math.random() * 1000), 
       email, 
-      role: role as any, // Cast for simplicity as UserRole is broader
+      role, 
       createdAt: new Date().toISOString(),
-      // FIX: Added dummy coins for new user login.
-      coins: 1000,
+      walletBalance: 0, 
+      coins: 0,
     }; 
 
-    // Store the token and profile separately, mimicking a real auth flow.
     localStorage.setItem('kodik-accessToken', dummyToken);
-    localStorage.setItem('kodik-user-profile', JSON.stringify(newUserProfile));
-    
-    // Update state to trigger re-renders
+    updateUserProfile(newUserProfile);
+    setTransactions([]); // Reset for new user
     setToken(dummyToken);
-    setUser(newUserProfile);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isLoading, spendCoins, topUpCoins }}>
+    <AuthContext.Provider value={{ 
+        user, 
+        token, 
+        login, 
+        logout, 
+        isAuthenticated: !!token, 
+        isLoading, 
+        transactions,
+        topUpWallet, 
+        withdrawWallet,
+        spendCoins, 
+        buyCoinsWithWallet,
+        exchangeCoinsToWallet
+    }}>
       {!isLoading && children}
     </AuthContext.Provider>
   );
