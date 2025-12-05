@@ -190,13 +190,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string, role: 'pembeli' | 'penjual') => {
     // Simulate Login
     const dummyToken = `dummy-token-for-${email}`;
+    // Give some initial balance for better demo experience
+    const initialBalance = 1000000; // 1 Juta
+    const initialCoins = 100;
+
     const newUserProfile: User = { 
       id: Math.floor(Math.random() * 1000), 
       email, 
       role, 
       createdAt: new Date().toISOString(),
-      walletBalance: 0, 
-      coins: 0,
+      walletBalance: initialBalance, 
+      coins: initialCoins,
     }; 
 
     localStorage.setItem('kodik-accessToken', dummyToken);

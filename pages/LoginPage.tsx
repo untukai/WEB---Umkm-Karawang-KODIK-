@@ -16,26 +16,37 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
+  // Update email default saat ganti role untuk kenyamanan demo
+  React.useEffect(() => {
+    if (role === 'penjual') {
+        setEmail(prev => prev || 'penjual@example.com');
+    } else {
+        setEmail(prev => prev === 'penjual@example.com' ? '' : prev);
+    }
+  }, [role]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    let loginEmail = email;
-    if (role === 'penjual') {
-      loginEmail = 'penjual@example.com';
-      showNotification('Info Demo', 'Anda masuk sebagai penjual demo (penjual@example.com).');
-    }
-
-    if (!loginEmail.trim() || !password.trim()) {
+    if (!email.trim() || !password.trim()) {
         showNotification('Gagal', 'Email dan password harus diisi.', 'error');
         return;
     }
     
     try {
-        await login(loginEmail, password, role);
-        const redirectUrl = searchParams.get('redirect') || (role === 'penjual' ? '/seller' : '/profile');
-        navigate(redirectUrl);
+        await login(email, password, role);
+        showNotification('Berhasil Masuk', `Selamat datang kembali sebagai ${role === 'penjual' ? 'Penjual' : 'Pembeli'}!`);
+        
+        // Redirect logic
+        const redirectUrl = searchParams.get('redirect');
+        if (redirectUrl) {
+            navigate(redirectUrl);
+        } else {
+            // Jika penjual, arahkan ke dashboard. Jika pembeli, ke home/profile.
+            navigate(role === 'penjual' ? '/seller' : '/profile');
+        }
     } catch (error) {
-        showNotification('Login Gagal', 'Email atau password salah.', 'error');
+        showNotification('Login Gagal', 'Terjadi kesalahan saat masuk.', 'error');
         console.error(error);
     }
   };
@@ -44,8 +55,8 @@ const LoginPage: React.FC = () => {
     <div className="flex justify-center items-center py-12 px-4">
       <div className="w-full max-w-md bg-white dark:bg-neutral-800 p-8 rounded-xl shadow-lg">
         <div className="text-center">
-            <h1 className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">Selamat Datang Kembali</h1>
-            <p className="text-neutral-500 dark:text-neutral-400 mt-2">Masuk untuk melanjutkan belanja di KODIK.</p>
+            <h1 className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">Selamat Datang</h1>
+            <p className="text-neutral-500 dark:text-neutral-400 mt-2">Masuk untuk mengakses akun KODIK Anda.</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-6 mt-8">
           <div>
@@ -75,10 +86,8 @@ const LoginPage: React.FC = () => {
               value={email} 
               onChange={(e) => setEmail(e.target.value)} 
               required 
-              placeholder={role === 'penjual' ? 'penjual@example.com' : 'pembeli@example.com'}
-              readOnly={role === 'penjual'}
+              placeholder={role === 'penjual' ? 'penjual@example.com' : 'nama@email.com'}
             />
-             {role === 'penjual' && <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Untuk demo, email penjual diatur otomatis.</p>}
           </div>
           <div>
             <label htmlFor="password"  className="block text-sm font-medium text-neutral-700 dark:text-neutral-200 mb-1">Password</label>
@@ -91,7 +100,9 @@ const LoginPage: React.FC = () => {
               placeholder="********"
             />
           </div>
-          <Button type="submit" className="w-full !font-bold !py-3">Masuk</Button>
+          <Button type="submit" className="w-full !font-bold !py-3">
+            Masuk sebagai {role === 'penjual' ? 'Penjual' : 'Pembeli'}
+          </Button>
         </form>
         <p className="text-center text-sm text-neutral-600 dark:text-neutral-300 mt-8">
           Belum punya akun? <a href="#" className="font-medium text-primary hover:underline">Daftar di sini</a>

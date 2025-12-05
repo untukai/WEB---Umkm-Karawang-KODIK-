@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useNotification } from '../hooks/useNotification';
 import { Order, FinancialTransaction } from '../types';
@@ -8,7 +8,7 @@ import Button from '../components/Button';
 import { 
     BoxIcon, TruckIcon, CheckCircleIcon, ChevronDownIcon, 
     CurrencyDollarIcon, PlusIcon, XIcon, MinusIcon, 
-    StoreIcon, WalletIcon 
+    StoreIcon, WalletIcon, ChartBarIcon
 } from '../components/Icons';
 
 // --- Components ---
@@ -377,11 +377,37 @@ const ProfilePage: React.FC = () => {
       {/* Header */}
       <div className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-lg flex justify-between items-center">
           <div>
-             <h1 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">Profil Saya</h1>
+             <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">Profil Saya</h1>
+                {user?.role === 'penjual' && (
+                    <span className="px-2 py-1 text-xs font-bold bg-primary/10 text-primary rounded-md">AKUN PENJUAL</span>
+                )}
+             </div>
              <p className="text-neutral-600 dark:text-neutral-400">{user?.email}</p>
           </div>
           <Button onClick={() => { logout(); navigate('/'); }} variant="outline">Keluar</Button>
       </div>
+      
+      {/* Seller Dashboard Access */}
+      {user?.role === 'penjual' && (
+          <div className="bg-primary/5 border border-primary/20 p-6 rounded-lg shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                  <div className="p-3 bg-primary rounded-full text-white">
+                      <StoreIcon className="w-8 h-8" />
+                  </div>
+                  <div>
+                      <h3 className="font-bold text-lg text-neutral-800 dark:text-neutral-100">Mode Penjual Aktif</h3>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-300">Kelola produk, pesanan, dan keuangan toko Anda.</p>
+                  </div>
+              </div>
+              <Link to="/seller" className="w-full sm:w-auto">
+                  <Button className="w-full flex items-center gap-2">
+                      <ChartBarIcon className="w-5 h-5" />
+                      Ke Dashboard Penjual
+                  </Button>
+              </Link>
+          </div>
+      )}
       
       {/* Wallet & Coins Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
