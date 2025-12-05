@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useNotification } from '../hooks/useNotification';
 import { Order } from '../types';
 import Button from '../components/Button';
-import { BoxIcon, TruckIcon, CheckCircleIcon, ChevronDownIcon } from '../components/Icons';
+import { BoxIcon, TruckIcon, CheckCircleIcon, ChevronDownIcon, CurrencyDollarIcon, PlusIcon, XIcon } from '../components/Icons';
 
 // Sub-component for displaying the visual order status tracker
 const OrderStatusTracker = ({ currentStatus }: { currentStatus: Order['status'] }) => {
@@ -42,11 +43,54 @@ const OrderStatusTracker = ({ currentStatus }: { currentStatus: Order['status'] 
   );
 };
 
+const TopUpModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
+    const { topUpCoins } = useAuth();
+    const { showNotification } = useNotification();
+    const amounts = [50, 100, 200, 500, 1000];
+
+    const handleTopUp = (amount: number) => {
+        topUpCoins(amount);
+        showNotification('Berhasil', `Berhasil isi ulang ${amount} Koin!`, 'success');
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 animate-fade-in-overlay" onClick={onClose}>
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl w-full max-w-sm animate-popup-in" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-4 border-b dark:border-neutral-700">
+                    <h3 className="font-bold text-lg text-neutral-800 dark:text-neutral-100">Isi Ulang Koin</h3>
+                    <button onClick={onClose}><XIcon className="w-6 h-6 text-neutral-500" /></button>
+                </div>
+                <div className="p-4 grid grid-cols-2 gap-3">
+                    {amounts.map(amount => (
+                        <button
+                            key={amount}
+                            onClick={() => handleTopUp(amount)}
+                            className="flex flex-col items-center justify-center p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-primary/10 hover:border-primary transition-colors"
+                        >
+                            <span className="text-xl font-bold text-yellow-500 flex items-center gap-1">
+                                <CurrencyDollarIcon className="w-5 h-5" />
+                                {amount}
+                            </span>
+                            <span className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                                Rp{(amount * 1000).toLocaleString('id-ID')}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ProfilePage: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [isTopUpOpen, setIsTopUpOpen] = useState(false);
 
 
   useEffect(() => {
@@ -89,13 +133,33 @@ const ProfilePage: React.FC = () => {
   }
 
   return (
-    <div>
-      <div className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-lg mb-8">
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-lg">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
-          <h1 className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">Profil Saya</h1>
+          <div>
+             <h1 className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">Profil Saya</h1>
+             <p className="text-lg text-neutral-700 dark:text-neutral-200 mt-1">Selamat datang, <span className="font-semibold">{user?.email}</span>!</p>
+          </div>
           <Button onClick={handleLogout} variant="outline">Keluar</Button>
         </div>
-        <p className="text-lg text-neutral-700 dark:text-neutral-200">Selamat datang, <span className="font-semibold">{user?.email}</span>!</p>
+        
+        {/* Wallet Section */}
+        <div className="mt-6 bg-gradient-to-r from-neutral-800 to-neutral-900 dark:from-neutral-700 dark:to-neutral-800 p-6 rounded-xl text-white shadow-md">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h3 className="text-neutral-300 text-sm font-medium mb-1">Dompet KODIK</h3>
+                    <div className="flex items-center gap-2">
+                         <CurrencyDollarIcon className="w-8 h-8 text-yellow-400" />
+                         <span className="text-3xl font-bold">{user?.coins || 0}</span>
+                         <span className="text-sm font-medium text-neutral-400 mt-2">Koin</span>
+                    </div>
+                </div>
+                <Button onClick={() => setIsTopUpOpen(true)} className="!bg-yellow-500 hover:!bg-yellow-600 text-neutral-900 !font-bold flex items-center gap-2">
+                    <PlusIcon className="w-5 h-5" />
+                    Isi Koin
+                </Button>
+            </div>
+        </div>
       </div>
 
       <div className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-lg">
@@ -161,6 +225,7 @@ const ProfilePage: React.FC = () => {
           )}
         </div>
       </div>
+      <TopUpModal isOpen={isTopUpOpen} onClose={() => setIsTopUpOpen(false)} />
     </div>
   );
 };

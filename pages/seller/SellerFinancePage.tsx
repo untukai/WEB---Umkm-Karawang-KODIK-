@@ -1,13 +1,21 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { financialTransactions } from '../../data/dummyData';
 import { FinancialTransaction } from '../../types';
 import Button from '../../components/Button';
-import { CurrencyDollarIcon } from '../../components/Icons';
+import { CurrencyDollarIcon, GiftIcon } from '../../components/Icons';
+import { useNotification } from '../../hooks/useNotification';
 
 const SellerFinancePage: React.FC = () => {
-    
-  const currentBalance = financialTransactions.reduce((acc, curr) => acc + curr.amount, 0);
+  const { showNotification } = useNotification();
+  
+  // Initialize states with dummy data
+  const [mainBalance, setMainBalance] = useState(() => 
+    financialTransactions.reduce((acc, curr) => acc + curr.amount, 0)
+  );
+  
+  // Dummy revenue from live gifts
+  const [giftRevenue, setGiftRevenue] = useState(250000); 
 
   const formatRupiah = (number: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
@@ -27,6 +35,31 @@ const SellerFinancePage: React.FC = () => {
       return amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
   }
 
+  const handleWithdrawMainBalance = () => {
+    if (mainBalance <= 0) {
+        showNotification('Gagal', 'Saldo tidak cukup untuk pencairan.', 'error');
+        return;
+    }
+    
+    const confirm = window.confirm(`Apakah Anda yakin ingin mencairkan dana sebesar ${formatRupiah(mainBalance)}?`);
+    if (confirm) {
+        setMainBalance(0);
+        showNotification('Berhasil', 'Permintaan pencairan dana telah dikirim.');
+    }
+  };
+
+  const handleWithdrawGiftRevenue = () => {
+    if (giftRevenue <= 0) {
+        showNotification('Gagal', 'Belum ada pendapatan dari gift.', 'error');
+        return;
+    }
+    
+    // Convert gift revenue to main balance
+    setMainBalance(prev => prev + giftRevenue);
+    setGiftRevenue(0);
+    showNotification('Berhasil', 'Pendapatan gift berhasil dipindahkan ke saldo utama.');
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -36,15 +69,25 @@ const SellerFinancePage: React.FC = () => {
 
       {/* Balance Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Main Balance Card */}
         <div className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-bold text-neutral-800 dark:text-neutral-100">Saldo Toko</h3>
-          <p className="text-3xl font-bold text-primary my-2">{formatRupiah(currentBalance)}</p>
-          <Button className="w-full mt-3">Cairkan Dana</Button>
+          <p className="text-3xl font-bold text-primary my-2">{formatRupiah(mainBalance)}</p>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">Total pendapatan dari penjualan produk.</p>
+          <Button onClick={handleWithdrawMainBalance} className="w-full">Cairkan Dana</Button>
         </div>
-        <div className="bg-white dark:bg-neutral-800 p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-bold text-neutral-800 dark:text-neutral-100">Pencairan Berikutnya</h3>
-           <p className="text-lg font-semibold text-neutral-600 dark:text-neutral-300 my-2">Rabu, 7 Agustus 2024</p>
-           <p className="text-sm text-neutral-500 dark:text-neutral-400">Pencairan dana dilakukan secara otomatis setiap hari Rabu.</p>
+
+        {/* Live Gift Revenue Card */}
+        <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-6 rounded-lg shadow-md border border-purple-100 dark:border-purple-800">
+          <div className="flex items-center gap-2 mb-2">
+             <GiftIcon className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+             <h3 className="text-lg font-bold text-neutral-800 dark:text-neutral-100">Pendapatan Live Gift</h3>
+          </div>
+          <p className="text-3xl font-bold text-purple-600 dark:text-purple-400 my-2">{formatRupiah(giftRevenue)}</p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-300 mb-4">Hasil saweran gift dari penonton saat live.</p>
+          <Button onClick={handleWithdrawGiftRevenue} variant="secondary" className="w-full bg-white dark:bg-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-600 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700">
+            Tarik ke Saldo
+          </Button>
         </div>
       </div>
       

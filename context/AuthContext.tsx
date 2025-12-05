@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User } from '../types';
 
@@ -10,6 +11,7 @@ interface AuthContextType {
   isLoading: boolean;
   // FIX: Added spendCoins functionality for live stream gifts.
   spendCoins: (amount: number) => boolean;
+  topUpCoins: (amount: number) => void;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -74,6 +76,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return false;
   };
 
+  const topUpCoins = (amount: number) => {
+    if (user) {
+        const updatedUser = { ...user, coins: (user.coins || 0) + amount };
+        setUser(updatedUser);
+        localStorage.setItem('kodik-user-profile', JSON.stringify(updatedUser));
+    }
+  };
+
   const login = async (email: string, password: string, role: 'pembeli' | 'penjual') => {
     // Simulate API call to get a token
     console.log(`Simulating login for ${email} with password ${password}`);
@@ -100,7 +110,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isLoading, spendCoins }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isLoading, spendCoins, topUpCoins }}>
       {!isLoading && children}
     </AuthContext.Provider>
   );
