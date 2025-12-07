@@ -13,7 +13,7 @@ import {
 
 // --- Components ---
 
-const PaymentMethodItem = ({ icon, name, onClick, selected }: { icon: string, name: string, onClick: () => void, selected: boolean }) => (
+const PaymentMethodItem: React.FC<{ icon: string, name: string, onClick: () => void, selected: boolean }> = ({ icon, name, onClick, selected }) => (
     <button 
         onClick={onClick}
         className={`flex items-center gap-3 w-full p-3 rounded-lg border transition-all ${selected ? 'border-primary bg-primary/5' : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700'}`}

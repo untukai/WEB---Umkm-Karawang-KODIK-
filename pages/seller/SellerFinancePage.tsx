@@ -2,31 +2,139 @@
 import React, { useState } from 'react';
 import { FinancialTransaction } from '../../types';
 import Button from '../../components/Button';
-import { GiftIcon, XIcon } from '../../components/Icons';
+import { GiftIcon, XIcon, ChevronDownIcon, CheckCircleIcon } from '../../components/Icons';
 import { useNotification } from '../../hooks/useNotification';
 import { useAuth } from '../../hooks/useAuth';
 
-// Use Transaction data from AuthContext for consistency
+// --- Reusing Payment Method Components ---
+const PaymentMethodItem: React.FC<{ icon: string, name: string, onClick: () => void, selected: boolean }> = ({ icon, name, onClick, selected }) => (
+    <button 
+        onClick={onClick}
+        className={`flex items-center gap-3 w-full p-3 rounded-lg border transition-all ${selected ? 'border-primary bg-primary/5' : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700'}`}
+    >
+        <span className="text-2xl">{icon}</span>
+        <span className="font-medium text-neutral-800 dark:text-neutral-100 flex-1 text-left">{name}</span>
+        {selected && <CheckCircleIcon className="w-5 h-5 text-primary" />}
+    </button>
+);
+
+const banks = [
+    { name: 'BCA', icon: '🏦' }, { name: 'BRI', icon: '🏦' }, { name: 'BTN', icon: '🏦' },
+    { name: 'BSI', icon: '🏦' }, { name: 'SeaBank', icon: '🏦' }, { name: 'Neo Bank', icon: '🏦' },
+    { name: 'OCBC', icon: '🏦' }, { name: 'BJB', icon: '🏦' }
+];
+
+// --- Seller Withdraw Modal ---
+const SellerWithdrawModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
+    const { withdrawWallet, user } = useAuth();
+    const { showNotification } = useNotification();
+    
+    const [step, setStep] = useState(1); // 1: Select Bank, 2: Details
+    const [selectedBank, setSelectedBank] = useState('');
+    const [accountNumber, setAccountNumber] = useState('');
+    const [amount, setAmount] = useState('');
+
+    const adminFee = 5000;
+    const nominalAmount = parseInt(amount.replace(/\D/g, '')) || 0;
+    const totalDeduction = nominalAmount + adminFee;
+
+    const reset = () => { setStep(1); setSelectedBank(''); setAccountNumber(''); setAmount(''); }
+    const handleClose = () => { reset(); onClose(); }
+
+    const handleConfirm = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (nominalAmount < 10000) { showNotification('Gagal', 'Minimal penarikan Rp 10.000', 'error'); return; }
+        if (!accountNumber) { showNotification('Gagal', 'Masukkan nomor rekening', 'error'); return; }
+        if (totalDeduction > (user?.walletBalance || 0)) { showNotification('Gagal', 'Saldo tidak mencukupi', 'error'); return; }
+
+        withdrawWallet(nominalAmount, selectedBank, accountNumber);
+        showNotification('Berhasil', 'Penarikan dana penjualan berhasil diajukan', 'success');
+        handleClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 animate-fade-in-overlay" onClick={handleClose}>
+            <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl w-full max-w-md animate-popup-in flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b dark:border-neutral-700">
+                    <div className="flex items-center gap-2">
+                        {step > 1 && <button onClick={() => setStep(step - 1)} className="p-1"><ChevronDownIcon className="w-5 h-5 rotate-90" /></button>}
+                        <h3 className="font-bold text-lg text-neutral-800 dark:text-neutral-100">{step === 1 ? 'Pilih Bank Tujuan' : 'Detail Penarikan'}</h3>
+                    </div>
+                    <button onClick={handleClose}><XIcon className="w-6 h-6 text-neutral-500" /></button>
+                </div>
+
+                <div className="p-4 overflow-y-auto custom-scrollbar">
+                    {step === 1 && (
+                        <div className="space-y-2">
+                            {banks.map(bank => (
+                                <PaymentMethodItem 
+                                    key={bank.name} icon={bank.icon} name={bank.name} 
+                                    onClick={() => { setSelectedBank(bank.name); setStep(2); }} 
+                                    selected={false} 
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    {step === 2 && (
+                        <form onSubmit={handleConfirm} className="space-y-4">
+                            <div className="flex items-center gap-3 p-3 bg-neutral-100 dark:bg-neutral-700 rounded-lg">
+                                <span className="text-2xl">🏦</span>
+                                <div><p className="text-xs text-neutral-500">Bank Tujuan</p><p className="font-bold">{selectedBank}</p></div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Nomor Rekening</label>
+                                <input type="number" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-neutral-700 dark:border-neutral-600" placeholder="Contoh: 1234567890" autoFocus />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Nominal Penarikan</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-neutral-500">Rp</span>
+                                    <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-neutral-700 dark:border-neutral-600" placeholder="Min 10.000" />
+                                </div>
+                                <p className="text-xs text-neutral-500 mt-1">Saldo Toko Tersedia: Rp {user?.walletBalance.toLocaleString()}</p>
+                            </div>
+
+                            <div className="bg-neutral-50 dark:bg-neutral-700/50 p-4 rounded-lg space-y-2 text-sm">
+                                <div className="flex justify-between"><span>Jumlah Diterima</span><span>Rp {nominalAmount.toLocaleString()}</span></div>
+                                <div className="flex justify-between"><span>Biaya Admin</span><span>Rp {adminFee.toLocaleString()}</span></div>
+                                <div className="border-t dark:border-neutral-600 my-2"></div>
+                                <div className="flex justify-between font-bold"><span>Total Potongan</span><span className="text-red-500">Rp {totalDeduction.toLocaleString()}</span></div>
+                            </div>
+
+                            <Button type="submit" className="w-full font-bold">Konfirmasi Penarikan</Button>
+                        </form>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const SellerFinancePage: React.FC = () => {
   const { showNotification } = useNotification();
-  const { user, transactions, withdrawWallet } = useAuth(); // Assuming Seller uses same AuthContext for wallet
+  const { user, transactions, withdrawGiftRevenue } = useAuth();
   
-  // Filter for 'Penarikan' or specific Seller transactions if needed. 
-  // For demo, we show all current user transactions.
   const myTransactions = transactions;
-
-  // Seller wallet is same as user wallet for this demo structure
   const mainBalance = user?.walletBalance || 0;
-  const [giftRevenue, setGiftRevenue] = useState(250000); 
+  const giftRevenue = user?.giftBalance || 0;
+  
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
 
   const formatRupiah = (number: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
 
   const handleWithdrawGiftRevenue = () => {
     if (giftRevenue <= 0) { showNotification('Gagal', 'Belum ada pendapatan dari gift.', 'error'); return; }
-    // Logic to move gift revenue to main wallet would be an API call
-    showNotification('Berhasil', 'Pendapatan gift dipindahkan ke saldo utama (Simulasi).', 'success');
-    setGiftRevenue(0);
+    
+    if (withdrawGiftRevenue()) {
+        showNotification('Berhasil', 'Pendapatan gift berhasil dipindahkan ke saldo utama.', 'success');
+    } else {
+        showNotification('Gagal', 'Terjadi kesalahan saat memproses.', 'error');
+    }
   };
 
   return (
@@ -52,7 +160,7 @@ const SellerFinancePage: React.FC = () => {
              <h3 className="text-lg font-bold">Pendapatan Gift Live</h3>
           </div>
           <p className="text-3xl font-bold text-purple-600 my-2">{formatRupiah(giftRevenue)}</p>
-          <Button onClick={handleWithdrawGiftRevenue} variant="secondary" className="w-full mt-4">Tarik ke Saldo</Button>
+          <Button onClick={handleWithdrawGiftRevenue} variant="secondary" className="w-full mt-4" disabled={giftRevenue <= 0}>Tarik ke Saldo</Button>
         </div>
       </div>
       
@@ -89,30 +197,7 @@ const SellerFinancePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Reusing the Logic for Withdraw Modal (Simplification: using local state here but logic connects to AuthContext) */}
-      {isWithdrawModalOpen && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setIsWithdrawModalOpen(false)}>
-              <div className="bg-white dark:bg-neutral-800 p-6 rounded-lg w-full max-w-md" onClick={e => e.stopPropagation()}>
-                  <h3 className="font-bold text-lg mb-4">Cairkan Dana</h3>
-                  <p className="mb-4 text-sm">Saldo akan dikirim ke rekening terdaftar. Biaya admin Rp 5.000.</p>
-                  <form onSubmit={(e) => {
-                      e.preventDefault();
-                      const amt = parseInt((e.target as any).amount.value);
-                      if (amt > 0) {
-                          if(withdrawWallet(amt, "Bank Terdaftar", "123xxxxx")) {
-                              showNotification("Berhasil", "Penarikan diajukan", "success");
-                              setIsWithdrawModalOpen(false);
-                          } else {
-                              showNotification("Gagal", "Saldo tidak cukup", "error");
-                          }
-                      }
-                  }}>
-                      <input name="amount" type="number" placeholder="Nominal Penarikan" className="w-full border p-2 rounded mb-4 dark:bg-neutral-700" autoFocus />
-                      <Button type="submit" className="w-full">Konfirmasi</Button>
-                  </form>
-              </div>
-          </div>
-      )}
+      <SellerWithdrawModal isOpen={isWithdrawModalOpen} onClose={() => setIsWithdrawModalOpen(false)} />
     </div>
   );
 };

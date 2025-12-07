@@ -17,6 +17,8 @@ interface AuthContextType {
   spendCoins: (amount: number) => boolean;
   buyCoinsWithWallet: (coinAmount: number) => boolean;
   exchangeCoinsToWallet: (coinAmount: number) => boolean;
+  // Seller functions
+  withdrawGiftRevenue: () => boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,9 +74,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const topUpWallet = (amount: number, method: string) => {
     if (user) {
         const adminFee = 1000; 
-        // Note: Dalam sistem nyata, user bayar (amount + adminFee), saldo nambah (amount).
-        // Di sini kita simulasikan user sudah bayar totalnya.
-        
         const updatedUser = { 
             ...user, 
             walletBalance: user.walletBalance + amount 
@@ -124,7 +123,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // --- 3. Beli Koin (Saldo -> Coin) ---
-  // Rate: 1 Coin = 1.000 IDR
   const buyCoinsWithWallet = (coinAmount: number): boolean => {
       const cost = coinAmount * 1000;
       if (user && user.walletBalance >= cost) {
@@ -150,7 +148,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // --- 4. Tukar Koin (Coin -> Saldo) ---
-  // Rate: 1 Coin = 1.000 IDR
   const exchangeCoinsToWallet = (coinAmount: number): boolean => {
       if (user && user.coins >= coinAmount) {
           const value = coinAmount * 1000;
@@ -175,13 +172,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return false;
   }
 
+  // --- 5. Tarik Pendapatan Gift (Gift Balance -> Saldo) ---
+  const withdrawGiftRevenue = (): boolean => {
+      if (user && user.giftBalance > 0) {
+          const amount = user.giftBalance;
+          const updatedUser = {
+              ...user,
+              giftBalance: 0,
+              walletBalance: user.walletBalance + amount
+          };
+          updateUserProfile(updatedUser);
+
+          addTransaction({
+              id: `GIFT-${Date.now()}`,
+              date: new Date().toISOString(),
+              type: 'Pendapatan',
+              description: 'Pencairan Pendapatan Gift Live',
+              amount: amount,
+              status: 'Selesai',
+              isCredit: true
+          });
+          return true;
+      }
+      return false;
+  }
+
   // --- Spend Coins (Gift) ---
   const spendCoins = (amount: number): boolean => {
     if (user && user.coins >= amount) {
         const updatedUser = { ...user, coins: user.coins - amount };
         updateUserProfile(updatedUser);
-        // Usually gifting doesn't create a financial transaction record for the spender in main history, 
-        // or it's a separate "Usage" history. For simplicity we skip main history or add minimal.
         return true;
     }
     return false;
@@ -190,9 +210,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string, role: 'pembeli' | 'penjual') => {
     // Simulate Login
     const dummyToken = `dummy-token-for-${email}`;
-    // Give some initial balance for better demo experience
-    const initialBalance = 1000000; // 1 Juta
+    const initialBalance = 1000000; 
     const initialCoins = 100;
+    const initialGiftBalance = role === 'penjual' ? 250000 : 0; // Seller starts with gift revenue for demo
 
     const newUserProfile: User = { 
       id: Math.floor(Math.random() * 1000), 
@@ -201,11 +221,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       createdAt: new Date().toISOString(),
       walletBalance: initialBalance, 
       coins: initialCoins,
+      giftBalance: initialGiftBalance
     }; 
 
     localStorage.setItem('kodik-accessToken', dummyToken);
     updateUserProfile(newUserProfile);
-    setTransactions([]); // Reset for new user
+    setTransactions([]);
     setToken(dummyToken);
   };
 
@@ -222,7 +243,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         withdrawWallet,
         spendCoins, 
         buyCoinsWithWallet,
-        exchangeCoinsToWallet
+        exchangeCoinsToWallet,
+        withdrawGiftRevenue
     }}>
       {!isLoading && children}
     </AuthContext.Provider>

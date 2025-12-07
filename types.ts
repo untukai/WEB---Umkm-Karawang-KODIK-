@@ -15,6 +15,7 @@ export interface User {
   createdAt: string; // ISO 8601
   walletBalance: number; // Saldo KODIK (Real Money)
   coins: number; // Virtual Coins for gifting
+  giftBalance: number; // Pendapatan dari Live Gift (belum ditarik ke wallet)
 }
 
 export interface Seller {
