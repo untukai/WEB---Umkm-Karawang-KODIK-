@@ -18,19 +18,30 @@ const PaymentMethodItem: React.FC<{ icon: string, name: string, onClick: () => v
     </button>
 );
 
-const banks = [
-    { name: 'BCA', icon: '🏦' }, { name: 'BRI', icon: '🏦' }, { name: 'BTN', icon: '🏦' },
-    { name: 'BSI', icon: '🏦' }, { name: 'SeaBank', icon: '🏦' }, { name: 'Neo Bank', icon: '🏦' },
-    { name: 'OCBC', icon: '🏦' }, { name: 'BJB', icon: '🏦' }
-];
+const paymentMethods = {
+    'QRIS': [{ name: 'QRIS (Scan)', icon: '📱' }],
+    'Merchant': [
+        { name: 'Indomaret', icon: '🏪' }, { name: 'Alfamart', icon: '🏪' }, 
+        { name: 'Lawson', icon: '🏪' }, { name: 'Family Mart', icon: '🏪' }, { name: 'DanDan', icon: '🏪' }
+    ],
+    'Bank': [
+        { name: 'BCA', icon: '🏦' }, { name: 'BRI', icon: '🏦' }, { name: 'BTN', icon: '🏦' },
+        { name: 'BSI', icon: '🏦' }, { name: 'SeaBank', icon: '🏦' }, { name: 'Neo Bank', icon: '🏦' },
+        { name: 'OCBC', icon: '🏦' }, { name: 'BJB', icon: '🏦' }
+    ],
+    'E-Wallet': [
+        { name: 'GoPay', icon: '🟢' }, { name: 'OVO', icon: '🟣' }, { name: 'Dana', icon: '🔵' }
+    ]
+};
 
 // --- Seller Withdraw Modal ---
 const SellerWithdrawModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
     const { withdrawWallet, user } = useAuth();
     const { showNotification } = useNotification();
     
-    const [step, setStep] = useState(1); // 1: Select Bank, 2: Details
-    const [selectedBank, setSelectedBank] = useState('');
+    const [step, setStep] = useState(1); // 1: Category, 2: Provider, 3: Details
+    const [selectedCategory, setSelectedCategory] = useState<string>('');
+    const [selectedProvider, setSelectedProvider] = useState<string>('');
     const [accountNumber, setAccountNumber] = useState('');
     const [amount, setAmount] = useState('');
 
@@ -38,7 +49,7 @@ const SellerWithdrawModal: React.FC<{ isOpen: boolean; onClose: () => void; }> =
     const nominalAmount = parseInt(amount.replace(/\D/g, '')) || 0;
     const totalDeduction = nominalAmount + adminFee;
 
-    const reset = () => { setStep(1); setSelectedBank(''); setAccountNumber(''); setAmount(''); }
+    const reset = () => { setStep(1); setSelectedCategory(''); setSelectedProvider(''); setAccountNumber(''); setAmount(''); }
     const handleClose = () => { reset(); onClose(); }
 
     const handleConfirm = (e: React.FormEvent) => {
@@ -47,9 +58,15 @@ const SellerWithdrawModal: React.FC<{ isOpen: boolean; onClose: () => void; }> =
         if (!accountNumber) { showNotification('Gagal', 'Masukkan nomor rekening', 'error'); return; }
         if (totalDeduction > (user?.walletBalance || 0)) { showNotification('Gagal', 'Saldo tidak mencukupi', 'error'); return; }
 
-        withdrawWallet(nominalAmount, selectedBank, accountNumber);
+        withdrawWallet(nominalAmount, selectedProvider, accountNumber);
         showNotification('Berhasil', 'Penarikan dana penjualan berhasil diajukan', 'success');
         handleClose();
+    };
+
+    const getInputLabel = () => {
+        if (selectedCategory === 'E-Wallet' || selectedCategory === 'Merchant') return 'Nomor HP';
+        if (selectedCategory === 'QRIS') return 'Nomor Referensi/HP';
+        return 'Nomor Rekening';
     };
 
     if (!isOpen) return null;
@@ -59,51 +76,67 @@ const SellerWithdrawModal: React.FC<{ isOpen: boolean; onClose: () => void; }> =
             <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl w-full max-w-md animate-popup-in flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between p-4 border-b dark:border-neutral-700">
                     <div className="flex items-center gap-2">
-                        {step > 1 && <button onClick={() => setStep(step - 1)} className="p-1"><ChevronDownIcon className="w-5 h-5 rotate-90" /></button>}
-                        <h3 className="font-bold text-lg text-neutral-800 dark:text-neutral-100">{step === 1 ? 'Pilih Bank Tujuan' : 'Detail Penarikan'}</h3>
+                        {step > 1 && <button onClick={() => setStep(step - 1)} className="p-1 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-700"><ChevronDownIcon className="w-5 h-5 rotate-90" /></button>}
+                        <h3 className="font-bold text-lg text-neutral-800 dark:text-neutral-100">
+                            {step === 1 ? 'Pilih Tujuan' : step === 2 ? `Pilih ${selectedCategory}` : 'Detail Penarikan'}
+                        </h3>
                     </div>
                     <button onClick={handleClose}><XIcon className="w-6 h-6 text-neutral-500" /></button>
                 </div>
 
                 <div className="p-4 overflow-y-auto custom-scrollbar">
                     {step === 1 && (
+                        <div className="space-y-3">
+                            <p className="text-sm text-neutral-500 mb-2">Pilih metode penarikan dana:</p>
+                            {Object.keys(paymentMethods).map(cat => (
+                                <button key={cat} onClick={() => { setSelectedCategory(cat); setStep(2); }} className="w-full p-4 flex justify-between items-center border dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+                                    <span className="font-medium text-lg">{cat}</span>
+                                    <ChevronDownIcon className="w-5 h-5 -rotate-90 text-neutral-400" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {step === 2 && (
                         <div className="space-y-2">
-                            {banks.map(bank => (
+                            {paymentMethods[selectedCategory as keyof typeof paymentMethods].map(provider => (
                                 <PaymentMethodItem 
-                                    key={bank.name} icon={bank.icon} name={bank.name} 
-                                    onClick={() => { setSelectedBank(bank.name); setStep(2); }} 
+                                    key={provider.name} icon={provider.icon} name={provider.name} 
+                                    onClick={() => { setSelectedProvider(provider.name); setStep(3); }} 
                                     selected={false} 
                                 />
                             ))}
                         </div>
                     )}
 
-                    {step === 2 && (
+                    {step === 3 && (
                         <form onSubmit={handleConfirm} className="space-y-4">
                             <div className="flex items-center gap-3 p-3 bg-neutral-100 dark:bg-neutral-700 rounded-lg">
-                                <span className="text-2xl">🏦</span>
-                                <div><p className="text-xs text-neutral-500">Bank Tujuan</p><p className="font-bold">{selectedBank}</p></div>
+                                <span className="text-2xl">
+                                    {Object.values(paymentMethods).flat().find(p => p.name === selectedProvider)?.icon}
+                                </span>
+                                <div><p className="text-xs text-neutral-500">Tujuan Penarikan</p><p className="font-bold">{selectedProvider}</p></div>
                             </div>
                             
                             <div>
-                                <label className="block text-sm font-medium mb-1">Nomor Rekening</label>
-                                <input type="number" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-neutral-700 dark:border-neutral-600" placeholder="Contoh: 1234567890" autoFocus />
+                                <label className="block text-sm font-medium mb-1">{getInputLabel()}</label>
+                                <input type="number" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-neutral-700 dark:border-neutral-600 dark:text-white" placeholder={`Masukkan ${getInputLabel().toLowerCase()}`} autoFocus />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-medium mb-1">Nominal Penarikan</label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-2.5 text-neutral-500">Rp</span>
-                                    <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-neutral-700 dark:border-neutral-600" placeholder="Min 10.000" />
+                                    <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-neutral-700 dark:border-neutral-600 dark:text-white" placeholder="Min 10.000" />
                                 </div>
                                 <p className="text-xs text-neutral-500 mt-1">Saldo Toko Tersedia: Rp {user?.walletBalance.toLocaleString()}</p>
                             </div>
 
                             <div className="bg-neutral-50 dark:bg-neutral-700/50 p-4 rounded-lg space-y-2 text-sm">
-                                <div className="flex justify-between"><span>Jumlah Diterima</span><span>Rp {nominalAmount.toLocaleString()}</span></div>
-                                <div className="flex justify-between"><span>Biaya Admin</span><span>Rp {adminFee.toLocaleString()}</span></div>
+                                <div className="flex justify-between dark:text-neutral-300"><span>Jumlah Diterima</span><span>Rp {nominalAmount.toLocaleString()}</span></div>
+                                <div className="flex justify-between dark:text-neutral-300"><span>Biaya Admin</span><span>Rp {adminFee.toLocaleString()}</span></div>
                                 <div className="border-t dark:border-neutral-600 my-2"></div>
-                                <div className="flex justify-between font-bold"><span>Total Potongan</span><span className="text-red-500">Rp {totalDeduction.toLocaleString()}</span></div>
+                                <div className="flex justify-between font-bold dark:text-white"><span>Total Potongan</span><span className="text-red-500">Rp {totalDeduction.toLocaleString()}</span></div>
                             </div>
 
                             <Button type="submit" className="w-full font-bold">Konfirmasi Penarikan</Button>
